@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-$dsn = 'mysql:host=localhost;dbname=customphp_db;charset=utf8mb4';
-$username = 'customphp_db_user';
-$password = 'customphp_db_password';
+$dsn = 'mysql:host=localhost;dbname=customphp_db4;charset=utf8mb4';
+$username = 'customphp_db_user4';
+$password = 'customphp_db_password4';
 $options = [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
