@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/functions.php';
+//require_once __DIR__ . '/functions.php';
 
 $errors = [];
 $success = false;
@@ -35,6 +35,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+function send_smtp_email(
+    string $toEmail,
+    string $toName,
+    string $subject,
+    string $body,
+    string $fromEmail,
+    string $fromName
+): void {
+    $smtpHost = 'sandbox.smtp.mailtrap.io';
+    $smtpPort = 587;
+    $smtpUser = '553853e14274b3';
+    $smtpPass = '023f4b4be4c34c';
+
+    $socket = stream_socket_client(
+        'tcp://' . $smtpHost . ':' . $smtpPort,
+        $errno,
+        $errstr,
+        15
+    );
+    if (!$socket) {
+        throw new RuntimeException('SMTP connect failed: ' . $errstr);
+    }
+
+    $read = static function () use ($socket): string {
+        $data = '';
+        while (($line = fgets($socket, 515)) !== false) {
+            $data .= $line;
+            if (isset($line[3]) && $line[3] === ' ') {
+                break;
+            }
+        }
+        return $data;
+    };
+
+    $write = static function (string $command) use ($socket): void {
+        fwrite($socket, $command . "\r\n");
+    };
+
+    $expect = static function (string $response, array $codes): void {
+        $code = substr($response, 0, 3);
+        if (!in_array($code, $codes, true)) {
+            throw new RuntimeException('SMTP error: ' . trim($response));
+        }
+    };
+
+    $expect($read(), ['220']);
+    $write('EHLO localhost');
+    $ehlo = $read();
+    $expect($ehlo, ['250']);
+
+    if (stripos($ehlo, 'STARTTLS') !== false) {
+        $write('STARTTLS');
+        $expect($read(), ['220']);
+        if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) {
+            throw new RuntimeException('SMTP TLS failed.');
+        }
+        $write('EHLO localhost');
+        $expect($read(), ['250']);
+    }
+
+    $write('AUTH LOGIN');
+    $expect($read(), ['334']);
+    $write(base64_encode($smtpUser));
+    $expect($read(), ['334']);
+    $write(base64_encode($smtpPass));
+    $expect($read(), ['235']);
+
+    $write('MAIL FROM:<' . $fromEmail . '>');
+    $expect($read(), ['250']);
+    $write('RCPT TO:<' . $toEmail . '>');
+    $expect($read(), ['250', '251']);
+
+    $write('DATA');
+    $expect($read(), ['354']);
+
+    $headers = [
+        'From: ' . $fromName . ' <' . $fromEmail . '>',
+        'To: ' . $toName . ' <' . $toEmail . '>',
+        'Reply-To: ' . $toEmail,
+        'Subject: ' . $subject,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+    ];
+
+    $message = implode("\r\n", $headers) . "\r\n\r\n" . $body;
+    $message = str_replace(["\r\n.\r\n", "\n.\n"], ["\r\n..\r\n", "\n..\n"], $message);
+
+    $write($message . "\r\n.");
+    $expect($read(), ['250']);
+
+    $write('QUIT');
+    fclose($socket);
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
