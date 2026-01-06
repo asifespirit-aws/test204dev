@@ -7,6 +7,6 @@
 </head>
 <body>
     <h2>Welcome to this server wiht git connection</h2>
-    <h4>and test auto deploye </h4>
+    <h4>and test auto deploye done</h4>
 </body>
 </html>
